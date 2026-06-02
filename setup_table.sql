@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS stock_lending_data (
 --     MODIFY amount VARCHAR(100) DEFAULT '',
 --     MODIFY rate DECIMAL(12, 6) NULL;
 
--- ON DUPLICATE KEY UPDATE needs this primary key or an equivalent unique key:
+-- The importer needs this primary key or an equivalent unique key to detect repeats:
 -- ALTER TABLE stock_lending_data
 --     ADD PRIMARY KEY (brokerage, data_date, stock_ticker, duration);
 

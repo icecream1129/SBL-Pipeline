@@ -11,7 +11,7 @@ import re
 import pandas as pd
 
 from brokerage_configs import BROKERAGE_CONFIGS
-from database import upsert_stock_lending_rows
+from database import import_stock_lending_rows
 
 
 FINAL_COLUMNS = ["stock_ticker", "amount", "duration", "rate"]
@@ -135,13 +135,35 @@ def build_standardized_dataframe(raw_df: pd.DataFrame, column_mapping: dict) -> 
     return output[FINAL_COLUMNS]
 
 
-def validate_required_mapped_columns(raw_df: pd.DataFrame, standardized_df: pd.DataFrame) -> None:
+def apply_default_duration(
+    standardized_df: pd.DataFrame,
+    default_duration_days,
+) -> pd.DataFrame:
+    """Fill duration when a brokerage config explicitly provides a default."""
+    if default_duration_days is None:
+        return standardized_df
+
+    standardized_df = standardized_df.copy()
+    standardized_df["duration"] = standardized_df["duration"].replace("", pd.NA)
+    standardized_df.loc[standardized_df["duration"].isna(), "duration"] = (
+        str(default_duration_days)
+    )
+    return standardized_df
+
+
+def validate_required_mapped_columns(
+    raw_df: pd.DataFrame,
+    standardized_df: pd.DataFrame,
+    default_duration_days=None,
+) -> None:
     """Fail early if required Excel columns were not mapped."""
     missing = [
         column
         for column in ("stock_ticker", "duration")
         if standardized_df[column].replace("", pd.NA).isna().all()
     ]
+    if "duration" in missing and default_duration_days is not None:
+        missing.remove("duration")
     if not missing:
         return
 
@@ -213,8 +235,19 @@ def main():
         rows_read = len(raw_df)
 
         column_mapping = BROKERAGE_CONFIGS[brokerage_key]["column_mapping"]
+        default_duration_days = BROKERAGE_CONFIGS[brokerage_key].get(
+            "default_duration_days"
+        )
         standardized_df = build_standardized_dataframe(raw_df, column_mapping)
-        validate_required_mapped_columns(raw_df, standardized_df)
+        standardized_df = apply_default_duration(
+            standardized_df,
+            default_duration_days=default_duration_days,
+        )
+        validate_required_mapped_columns(
+            raw_df,
+            standardized_df,
+            default_duration_days=default_duration_days,
+        )
         standardized_df = clean_standardized_dataframe(standardized_df)
         valid_rows, skipped_reasons = validate_and_clean_rows(
             standardized_df,
@@ -223,13 +256,22 @@ def main():
             source_file=file_path.name,
         )
 
-        inserted_or_updated = upsert_stock_lending_rows(valid_rows)
+        import_summary = import_stock_lending_rows(valid_rows)
+        skipped_count = rows_read - len(valid_rows)
 
         print("\nImport summary")
         print("--------------")
         print(f"Rows read: {rows_read}")
-        print(f"Rows inserted/updated: {inserted_or_updated}")
-        print(f"Rows skipped: {rows_read - len(valid_rows)}")
+        print(f"Rows inserted: {import_summary['inserted']}")
+        print(f"Rows updated: {import_summary['updated']}")
+        print(f"Rows unchanged duplicates: {import_summary['unchanged_duplicates']}")
+        print(f"Rows skipped: {skipped_count}")
+
+        if import_summary["unchanged_duplicates"]:
+            print(
+                "\nUnchanged duplicates mean the row already existed in MySQL "
+                "with the same amount, rate, and source file, so it was left alone."
+            )
 
         if skipped_reasons:
             print("\nSkipped row reasons:")

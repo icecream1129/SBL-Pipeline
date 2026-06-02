@@ -1,8 +1,9 @@
-"""MySQL connection and upsert helpers for the SBL daily importer."""
+"""MySQL connection and insert/update helpers for the SBL daily importer."""
 
 from __future__ import annotations
 
 import os
+from decimal import Decimal
 from typing import Iterable
 
 import mysql.connector
@@ -71,7 +72,7 @@ def validate_table_structure(connection) -> None:
         problems.append(
             "primary key should be "
             + ", ".join(expected_primary_key)
-            + " for ON DUPLICATE KEY UPDATE to work"
+            + " so duplicate rows can be detected"
         )
 
     if problems:
@@ -82,13 +83,48 @@ def validate_table_structure(connection) -> None:
         )
 
 
-def upsert_stock_lending_rows(rows: Iterable[dict]) -> int:
-    """Insert rows and update existing rows that share the table primary key."""
-    rows = list(rows)
-    if not rows:
-        return 0
+def values_are_equal(existing_value, new_value) -> bool:
+    """Compare MySQL values with cleaned Python values."""
+    if existing_value is None and new_value is None:
+        return True
+    if existing_value is None or new_value is None:
+        return False
+    if isinstance(existing_value, Decimal) or isinstance(new_value, Decimal):
+        return Decimal(str(existing_value)) == Decimal(str(new_value))
+    return str(existing_value) == str(new_value)
 
-    sql = """
+
+def rows_are_unchanged(existing_row: dict, new_row: dict) -> bool:
+    """Return True when the database row already matches the upload row."""
+    return (
+        values_are_equal(existing_row["amount"], new_row["amount"])
+        and values_are_equal(existing_row["rate"], new_row["rate"])
+        and values_are_equal(existing_row["source_file"], new_row["source_file"])
+    )
+
+
+def import_stock_lending_rows(rows: Iterable[dict]) -> dict:
+    """Insert new rows, update changed rows, and count unchanged duplicates."""
+    rows = list(rows)
+    summary = {
+        "inserted": 0,
+        "updated": 0,
+        "unchanged_duplicates": 0,
+    }
+    if not rows:
+        return summary
+
+    select_sql = """
+        SELECT amount, rate, source_file
+        FROM stock_lending_data
+        WHERE brokerage = %(brokerage)s
+          AND data_date = %(data_date)s
+          AND stock_ticker = %(stock_ticker)s
+          AND duration = %(duration)s
+        LIMIT 1
+    """
+
+    insert_sql = """
         INSERT INTO stock_lending_data (
             brokerage,
             data_date,
@@ -107,18 +143,38 @@ def upsert_stock_lending_rows(rows: Iterable[dict]) -> int:
             %(rate)s,
             %(source_file)s
         )
-        ON DUPLICATE KEY UPDATE
-            amount = VALUES(amount),
-            rate = VALUES(rate),
-            source_file = VALUES(source_file),
+    """
+
+    update_sql = """
+        UPDATE stock_lending_data
+        SET
+            amount = %(amount)s,
+            rate = %(rate)s,
+            source_file = %(source_file)s,
             updated_at = CURRENT_TIMESTAMP
+        WHERE brokerage = %(brokerage)s
+          AND data_date = %(data_date)s
+          AND stock_ticker = %(stock_ticker)s
+          AND duration = %(duration)s
     """
 
     connection = get_connection()
     try:
         validate_table_structure(connection)
-        with connection.cursor() as cursor:
-            cursor.executemany(sql, rows)
+        with connection.cursor(dictionary=True) as cursor:
+            for row in rows:
+                cursor.execute(select_sql, row)
+                existing_row = cursor.fetchone()
+
+                if existing_row is None:
+                    cursor.execute(insert_sql, row)
+                    summary["inserted"] += 1
+                elif rows_are_unchanged(existing_row, row):
+                    summary["unchanged_duplicates"] += 1
+                else:
+                    cursor.execute(update_sql, row)
+                    summary["updated"] += 1
+
         connection.commit()
     except Exception:
         connection.rollback()
@@ -126,4 +182,4 @@ def upsert_stock_lending_rows(rows: Iterable[dict]) -> int:
     finally:
         connection.close()
 
-    return len(rows)
+    return summary

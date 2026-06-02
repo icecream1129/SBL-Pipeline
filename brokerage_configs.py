@@ -6,61 +6,66 @@ column names used by main_import.py.
 """
 
 BROKERAGE_CONFIGS = {
-    "BrokerageA": {
-        "brokerage_name": "BrokerageA",
+    "Huatai": {
+        "brokerage_name": "Huatai",
         "column_mapping": {
-            "stock code": "stock_ticker",
-            "stock ticker": "stock_ticker",
-            "ticker": "stock_ticker",
             "证券代码": "stock_ticker",
-            "qty": "amount",
-            "quantity": "amount",
-            "amount": "amount",
+            "证劵代码": "stock_ticker",
+            "stock code": "stock_ticker",
+            "数量（股）": "amount",
             "数量": "amount",
-            "days": "duration",
-            "duration": "duration",
+            "可用数量": "amount",
             "期限": "duration",
-            "rate": "rate",
-            "fee rate": "rate",
+            "最长可用期限": "duration",
+            "利率": "rate",
             "费率": "rate",
         },
     },
-    "BrokerageB": {
-        "brokerage_name": "BrokerageB",
+    "Guotai": {
+        "brokerage_name": "Guotai",
         "column_mapping": {
-            "stock code": "stock_ticker",
             "证券代码": "stock_ticker",
-            "available quantity": "amount",
+            "证劵代码": "stock_ticker",
+            "stock code": "stock_ticker",
+            "数量": "amount",
             "可用数量": "amount",
-            "duration": "duration",
             "最长可用期限": "duration",
-            "rate": "rate",
-            "参考基准费率": "rate",
-        },
-    },
-    "BrokerageC": {
-        "brokerage_name": "BrokerageC",
-        "column_mapping": {
-            "stock code": "stock_ticker",
-            "证券代码": "stock_ticker",
-            "quantity": "amount",
-            "数量": "amount",
-            "duration": "duration",
             "期限": "duration",
-            # If this brokerage has no rate column, leave rate mappings out.
-        },
-    },
-    "BrokerageD": {
-        "brokerage_name": "BrokerageD",
-        "column_mapping": {
-            "stock code": "stock_ticker",
-            "证券代码": "stock_ticker",
-            "amount": "amount",
-            "数量": "amount",
-            "days": "duration",
-            "期限": "duration",
-            "rate": "rate",
+            "费率": "rate",
             "利率": "rate",
+        },
+    },
+    "CITIC": {
+        "brokerage_name": "CITIC",
+        "column_mapping": {
+            "证券代码": "stock_ticker",
+            "证劵代码": "stock_ticker",
+            "stock code": "stock_ticker",
+            "数量": "amount",
+            "可用数量": "amount",
+            "期限": "duration",
+            "最长可用期限": "duration",
+        },
+    },
+    "Haitong": {
+        "brokerage_name": "Haitong",
+        # Use 0 when this brokerage's file does not provide a duration column.
+        # This keeps the primary key consistent while marking duration as unknown.
+        "default_duration_days": 0,
+        "column_mapping": {
+            "Stock Code": "stock_ticker",
+            "证券代码": "stock_ticker",
+            "证劵代码": "stock_ticker",
+            "Available Quantity": "amount",
+            "数量": "amount",
+            "可用数量": "amount",
+            "期限": "duration",
+            "最长可用期限": "duration",
+            "Duration": "duration",
+            "Rate(%)": "rate",
+            "费率": "rate",
+            "利率": "rate",
+            "参考基准费率": "rate",
         },
     },
 }

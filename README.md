@@ -1,4 +1,4 @@
-# Daily SBL Excel Importer Template
+# Daily SBL Excel Importer
 
 This project imports daily stock lending Excel `.xlsx` files from multiple brokerages into one MySQL table:
 
@@ -22,7 +22,6 @@ Each brokerage can use different Excel column names. Update `brokerage_configs.p
 From this folder:
 
 ```bash
-cd SBL_pipeline_template
 python3 -m pip install -r requirements.txt
 ```
 
@@ -39,8 +38,8 @@ Then edit `.env` with your real MySQL details:
 ```text
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
-MYSQL_USER=your_username
-MYSQL_PASSWORD=your_password
+MYSQL_USER=root
+MYSQL_PASSWORD=your_real_password
 MYSQL_DATABASE=new_schema
 ```
 
@@ -50,7 +49,7 @@ Do not put real passwords into the Python files.
 
 Open `setup_table.sql` in your MySQL client and run the `CREATE TABLE IF NOT EXISTS` statement.
 
-If you already have a table, inspect it first and review the commented `ALTER TABLE` suggestions in `setup_table.sql`. Do not drop or recreate a table that contains important data unless you have a backup.
+Your current table already existed when this project was created. It had the core columns, but was missing the tracking fields and did not have the preferred primary key. Review the commented `ALTER TABLE` suggestions in `setup_table.sql` before running them.
 
 The importer uses this duplicate/update rule:
 
@@ -58,7 +57,9 @@ The importer uses this duplicate/update rule:
 brokerage + data_date + stock_ticker + duration
 ```
 
-For `ON DUPLICATE KEY UPDATE` to work, the table needs a primary key or unique key on those four columns.
+The table needs a primary key or unique key on those four columns so the importer can tell whether a row is new, changed, or already unchanged.
+
+When a row already exists, the importer compares `amount`, `rate`, and `source_file`. Exact matches are counted as unchanged duplicates and are not updated.
 
 ## Run the Importer
 
