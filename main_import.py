@@ -269,7 +269,7 @@ def main():
 
         if import_summary["unchanged_duplicates"]:
             print(
-                "\nUnchanged duplicates mean the row already existed in MySQL "
+                "\nUnchanged duplicates mean the row already existed in the database "
                 "with the same amount, rate, and source file, so it was left alone."
             )
 
